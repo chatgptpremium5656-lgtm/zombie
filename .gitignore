@@ -33,3 +33,6 @@ crashlytics-build.properties
 .idea/
 .vs/
 .vscode/
+
+# Local screenshots from play sessions
+/[Ss]creenshots/
