@@ -2,7 +2,7 @@
     "name": "Zombie.Tests.EditMode",
     "rootNamespace": "Zombie.Tests",
     "references": [
-        "Zombie.Runtime",
+        "Zombie.Logic",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],
