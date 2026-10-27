@@ -47,7 +47,8 @@ namespace Zombie.Logic
         static int Scale(int value, float factor)
         {
             if (value <= 0) return 0;
-            int scaled = (int)Math.Ceiling(value * factor);
+            // Small tolerance: 10 * 0.1f is 1.0000000149 in float math, which must stay 1, not round up to 2.
+            int scaled = (int)Math.Ceiling(value * (double)factor - 1e-4);
             return scaled < 1 ? 1 : scaled;
         }
 
