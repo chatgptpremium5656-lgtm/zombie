@@ -390,7 +390,8 @@ namespace Zombie.Building
 
         public void DestroyPiece(BuildingPiece piece)
         {
-            if (piece == null) return;
+            // A piece already removed by a collapse may still take a hit before Unity destroys it this frame.
+            if (piece == null || !_pieces.TryGetValue(piece.Slot, out var current) || current != piece) return;
             _removed.Clear();
             _grid.Remove(piece.Slot, _removed);
             if (_removed.Count == 0) _removed.Add(piece.Slot);
@@ -487,7 +488,7 @@ namespace Zombie.Building
             for (int i = 0; i < count; i++)
             {
                 var col = _overlap[i];
-                if (col == _groundCollider || col.GetComponentInParent<BuildingPiece>() != null) continue;
+                if (col == _groundCollider) continue;
                 p.Valid = false;
                 p.Reason = "Мешает объект";
                 break;

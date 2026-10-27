@@ -26,7 +26,7 @@ namespace Zombie.Player
             _controller.height = 1.8f;
             _controller.radius = 0.35f;
             _controller.center = new Vector3(0, 0.9f, 0);
-            _controller.stepOffset = 0.45f;
+            _controller.stepOffset = 0.65f; // foundations are 0.6 m high: walk straight onto them
             _controller.slopeLimit = 50f; // building stairs are 45 degrees
             _controller.skinWidth = 0.04f;
 

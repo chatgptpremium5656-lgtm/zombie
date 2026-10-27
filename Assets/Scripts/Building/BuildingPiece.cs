@@ -151,10 +151,27 @@ namespace Zombie.Building
             if (HealthValue <= 0f) _system.DestroyPiece(this);
         }
 
+        Collider[] _colliders;
+
+        /// <summary>Nearest point over all of the piece's colliders (doorways have three, stairs keep theirs on a child).</summary>
         public Vector3 ClosestPoint(Vector3 from)
         {
-            var col = GetComponent<Collider>();
-            return col != null ? col.ClosestPoint(from) : transform.position;
+            if (_colliders == null || _colliders.Length == 0) _colliders = GetComponentsInChildren<Collider>();
+            var best = transform.position;
+            float bestSq = float.MaxValue;
+            for (int i = 0; i < _colliders.Length; i++)
+            {
+                var c = _colliders[i];
+                if (c == null || !c.enabled || c.GetComponentInParent<Door>() != null) continue;
+                var p = c.ClosestPoint(from);
+                float sq = (p - from).sqrMagnitude;
+                if (sq < bestSq)
+                {
+                    bestSq = sq;
+                    best = p;
+                }
+            }
+            return best;
         }
     }
 }

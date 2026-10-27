@@ -38,6 +38,10 @@ namespace Zombie.UI
         string _hpText;
         int _hotbarVersion = -1;
         readonly System.Collections.Generic.List<string> _hotbarText = new System.Collections.Generic.List<string>();
+        int _craftVersion = -1;
+        readonly string[] _craftLabels = new string[ItemCatalog.Count];
+        int _deathSecs = -1;
+        string _deathText;
         int _hintKey = -1;
         string _hintReason;
         string _hintText;
@@ -324,15 +328,25 @@ namespace Zombie.UI
             Fill(r, new Color(0.1f, 0.1f, 0.09f, 0.95f));
             GUI.Label(new Rect(r.x, r.y + 6f, r.width, unit * 1.8f), "<b>Крафт</b>   (Tab — закрыть)", _labelCenter);
 
+            if (_craftVersion != inv.Version)
+            {
+                _craftVersion = inv.Version;
+                for (int i = 0; i < ItemCatalog.Count; i++)
+                {
+                    var d = ItemCatalog.GetByIndex(i);
+                    bool owned = d.Kind != ItemKind.Placeable && inv.Has(d.Id);
+                    string status = owned ? "<color=#9fd39a>есть</color>" : BuildingSystem.CostText(d.Recipe);
+                    _craftLabels[i] = "<b>" + d.Name + "</b>   " + status;
+                }
+            }
+
             float y = r.y + unit * 2.6f;
             for (int i = 0; i < ItemCatalog.Count; i++)
             {
                 var def = ItemCatalog.GetByIndex(i);
                 if (!ItemCatalog.IsCraftable(def.Id)) continue;
-                bool owned = def.Kind != ItemKind.Placeable && inv.Has(def.Id);
                 bool can = inv.CanCraft(def.Id);
-                string status = owned ? "<color=#9fd39a>есть</color>" : BuildingSystem.CostText(def.Recipe);
-                string label = "<b>" + def.Name + "</b>   " + status;
+                string label = _craftLabels[i];
                 GUI.enabled = can;
                 if (GUI.Button(new Rect(r.x + 12f, y, r.width - 24f, rowH - 6f), label, _button))
                 {
@@ -368,8 +382,13 @@ namespace Zombie.UI
         {
             Fill(new Rect(0, 0, w, h), new Color(0.25f, 0f, 0f, 0.5f));
             GUI.Label(new Rect(0, h * 0.35f, w, _big.fontSize * 1.6f), "Вы погибли", _big);
-            GUI.Label(new Rect(0, h * 0.35f + _big.fontSize * 1.8f, w, _label.fontSize * 1.6f),
-                "Всё, что было с собой, потеряно. Возрождение через " + Mathf.CeilToInt(_player.RespawnTimeLeft), _labelCenter);
+            int secs = Mathf.CeilToInt(_player.RespawnTimeLeft);
+            if (secs != _deathSecs)
+            {
+                _deathSecs = secs;
+                _deathText = "Всё, что было с собой, потеряно. Возрождение через " + secs;
+            }
+            GUI.Label(new Rect(0, h * 0.35f + _big.fontSize * 1.8f, w, _label.fontSize * 1.6f), _deathText, _labelCenter);
         }
     }
 }

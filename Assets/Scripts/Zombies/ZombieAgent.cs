@@ -48,8 +48,12 @@ namespace Zombie.Zombies
         public Vector3 Position => _transform.position;
         public float Radius => Stats.Radius;
 
-        static readonly RaycastHit[] HitBuffer = new RaycastHit[4];
-        static readonly Collider[] OverlapBuffer = new Collider[8];
+        /// <summary>Zombies live on the built-in "Ignore Raycast" layer so their own casts skip each other.</summary>
+        public const int ZombieLayer = 2;
+        const int SenseMask = ~(1 << ZombieLayer);
+
+        static readonly RaycastHit[] HitBuffer = new RaycastHit[16];
+        static readonly Collider[] OverlapBuffer = new Collider[32];
 
         Transform _transform;
         Transform _body;
@@ -67,6 +71,7 @@ namespace Zombie.Zombies
         float _sidestep; // -1/0/+1 while walking around a tree or rock
         float _sidestepTimer;
         IBuildingPart _blocker;
+        Vector3 _moveVelocity;
         float _blockerSince;
         PlayerAvatar _target;
         Vector3 _wanderPoint;
@@ -91,6 +96,8 @@ namespace Zombie.Zombies
             capsule.center = new Vector3(0, 0.9f * stats.Scale, 0);
             _collider = capsule;
 
+            gameObject.layer = ZombieLayer;
+            body.layer = ZombieLayer;
             var rb = gameObject.AddComponent<Rigidbody>();
             rb.isKinematic = true;
             rb.useGravity = false;
@@ -245,6 +252,7 @@ namespace Zombie.Zombies
 
                 var move = dir * Stats.Speed + separation;
                 if (_wandering && dist < 1.5f) move = separation;
+                _moveVelocity = move;
                 pos += move * dt;
                 pos.y = 0f;
                 _transform.position = pos;
@@ -283,7 +291,12 @@ namespace Zombie.Zombies
                 else
                 {
                     if ((_wanderPoint - pos).sqrMagnitude < 4f)
+                    {
+                        float limit = Game.Config != null ? Game.Config.mapHalfSize - 3f : 75f;
                         _wanderPoint = pos + new Vector3(Random.Range(-15f, 15f), 0, Random.Range(-15f, 15f));
+                        _wanderPoint.x = Mathf.Clamp(_wanderPoint.x, -limit, limit);
+                        _wanderPoint.z = Mathf.Clamp(_wanderPoint.z, -limit, limit);
+                    }
                     best = null;
                 }
             }
@@ -316,16 +329,33 @@ namespace Zombie.Zombies
                 }
             }
 
-            // Anything in the way? Buildings get attacked, trees and rocks get walked around.
             var origin = pos + Vector3.up * 0.45f;
-            float castDist = Stats.Speed * 0.1f + Stats.Radius + 0.3f;
-            int count = Physics.SphereCastNonAlloc(origin, Stats.Radius * 0.9f, dir, HitBuffer, castDist, ~0,
+
+            // Already touching a building part (e.g. shoved into it by the crowd)? Casts skip colliders
+            // they start inside, so check overlap first and attack what we are pressed against.
+            int touching = Physics.OverlapSphereNonAlloc(origin, Stats.Radius, OverlapBuffer, SenseMask, QueryTriggerInteraction.Ignore);
+            for (int i = 0; i < touching; i++)
+            {
+                var touched = OverlapBuffer[i].GetComponentInParent<IBuildingPart>();
+                if (touched != null && touched.IsAlive)
+                {
+                    _blocker = touched;
+                    _blockerSince = Time.time;
+                    return;
+                }
+            }
+
+            // Anything in the way? Sweep along the real movement (goal + crowd push), long enough to cover
+            // the distance walked until the next check. Buildings get attacked, trees and rocks walked around.
+            var velocity = new Vector3(_moveVelocity.x, 0f, _moveVelocity.z);
+            float speed = velocity.magnitude;
+            var castDir = speed > 0.1f ? velocity / speed : dir;
+            float castDist = Mathf.Max(speed, Stats.Speed) * 0.1f + Stats.Radius + 0.3f;
+            int count = Physics.SphereCastNonAlloc(origin, Stats.Radius * 0.9f, castDir, HitBuffer, castDist, SenseMask,
                 QueryTriggerInteraction.Ignore);
             for (int i = 0; i < count; i++)
             {
                 var col = HitBuffer[i].collider;
-                if (col == _collider || col.attachedRigidbody != null && col.attachedRigidbody.gameObject.GetComponent<ZombieAgent>() != null)
-                    continue;
                 var part = col.GetComponentInParent<IBuildingPart>();
                 if (part != null && part.IsAlive)
                 {
@@ -347,7 +377,7 @@ namespace Zombie.Zombies
 
         static IBuildingPart FindNearbyBuilding(Vector3 pos)
         {
-            int count = Physics.OverlapSphereNonAlloc(pos + Vector3.up * 0.5f, 2.2f, OverlapBuffer, ~0, QueryTriggerInteraction.Ignore);
+            int count = Physics.OverlapSphereNonAlloc(pos + Vector3.up * 0.5f, 2.2f, OverlapBuffer, SenseMask, QueryTriggerInteraction.Ignore);
             IBuildingPart best = null;
             float bestSq = float.MaxValue;
             for (int i = 0; i < count; i++)
